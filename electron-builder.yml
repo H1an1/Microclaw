@@ -1,0 +1,44 @@
+appId: ai.openclaw.microclaw
+productName: MicroClawDesktop
+copyright: Copyright © 2026 MicroClaw
+
+directories:
+  output: release
+
+win:
+  target: nsis
+  icon: assets/microclaw.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: OpenClaw
+
+extraResources:
+  - from: resources/node.exe
+    to: node.exe
+  - from: resources/openclaw/
+    to: openclaw/
+  - from: ../appcontainer/bin/Release/net9.0-windows/win-x64/AppContainerLauncher.exe
+    to: AppContainerLauncher.exe
+  - from: ../appcontainer/sandbox-preload.js
+    to: sandbox-preload.js
+  - from: ../appcontainer/sandbox-state.js
+    to: sandbox-state.js
+  - from: ../appcontainer/sandbox-permission.js
+    to: sandbox-permission.js
+  - from: ../appcontainer/sandbox-fs-hooks.js
+    to: sandbox-fs-hooks.js
+  - from: ../appcontainer/sandbox-cp-hooks.js
+    to: sandbox-cp-hooks.js
+  - from: ../appcontainer/path-extraction.js
+    to: path-extraction.js
+
+files:
+  - dist/**/*
+  - renderer/dist/**/*
+  - assets/**/*
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,README,readme}"
+  - "!**/node_modules/.cache"

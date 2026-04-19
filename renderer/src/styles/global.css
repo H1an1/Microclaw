@@ -1,0 +1,216 @@
+/* ── MAI Design Token layers (static → alias → semantic) ── */
+@import './mai-tokens/static.default.css';
+@import './mai-tokens/alias.light.css';
+@import './mai-tokens/default.light.css';
+
+/* ── MAI Fonts ── */
+@font-face {
+  font-family: 'Segoe Sans';
+  src: url('./fonts/segoe-sans.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ginto Copilot';
+  src: url('./fonts/GintoCopilotUpright.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cascadia Code';
+  src: url('./fonts/CascadiaCode.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ══════════════════════════════════════════════
+   App-level semantic variables mapped to MAI tokens
+   Components use these — not MAI tokens directly.
+   Light mode (default)
+══════════════════════════════════════════════ */
+:root {
+  /* ── Backgrounds ── */
+  --bg-primary:    var(--smtc-background-web-page-secondary);   /* #ffffff */
+  --bg-secondary:  var(--smtc-background-web-page-secondary);   /* #ffffff */
+  --bg-tertiary:   var(--smtc-background-web-page-primary);     /* #f8f4f1  warm stone */
+  --bg-grouped:    var(--smtc-background-web-page-secondary);   /* #ffffff */
+  --bg-input:      var(--smtc-ctrl-input-background-rest);      /* #0000000d */
+  --bg-chat:       var(--smtc-background-web-page-primary);     /* #f8f4f1 */
+
+  /* ── Text ── */
+  --text-primary:   var(--smtc-foreground-ctrl-neutral-primary-rest);   /* #272320 */
+  --text-secondary: var(--smtc-foreground-ctrl-neutral-secondary-rest); /* #4c4642 */
+  --text-muted:     var(--smtc-foreground-ctrl-hint-default);           /* #cfc9c5 */
+
+  /* ── Accent (caramel orange) ── */
+  --accent:               var(--alias-color-accent-450);            /* #a25a02 */
+  --accent-hover:         var(--alias-color-accent-550);            /* #8a4b01 */
+  --accent-subtle:        var(--smtc-background-ctrl-subtle-hover); /* #0000000d */
+  --accent-light:         var(--alias-color-accent-200);            /* #fee6d4 */
+  --accent-selected:      var(--alias-color-accent-400);            /* #ca7d36 */
+  --accent-selected-bg:   var(--alias-color-accent-100);            /* #fffbf8 */
+
+  /* ── Borders ── */
+  --border:         var(--smtc-stroke-card-on-primary-rest);  /* #0000001f */
+  --border-row:     var(--smtc-stroke-divider-subtle);        /* #0000001a */
+  --border-light:   var(--alias-color-stroke-muted-200);      /* #efeae7 */
+
+  /* ── Messages ── */
+  --msg-user-bg:   var(--smtc-background-ctrl-brand-rest);    /* #272320 */
+  --msg-user-text: var(--smtc-foreground-ctrl-on-brand-rest); /* #e2ddd9 */
+  --msg-ai-bg:     transparent;
+
+  /* ── Status ── */
+  --danger:  var(--smtc-status-danger-background);  /* #ac1922 */
+  --success: var(--smtc-status-success-background); /* #01712b */
+  --warning: var(--smtc-status-warning-background); /* #a25a02 */
+
+  /* ── Layout ── */
+  --sidebar-width: 240px;
+
+  /* ── Radii ── */
+  --card-radius: var(--mai-smtc-corner-window-mac-os); /* 20px */
+
+  /* ── Elevation ── */
+  --card-shadow:       var(--smtc-shadow-card-rest-key), var(--smtc-shadow-card-rest-ambient);
+  --card-shadow-hover: var(--smtc-shadow-flyout-key),    var(--smtc-shadow-flyout-ambient);
+}
+
+/* ══════════════════════════════════════════════
+   Base reset
+══════════════════════════════════════════════ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Segoe Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  font-size: 14px;
+  font-weight: var(--smtc-text-style-default-regular-weight, 450);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: var(--static-typography-letter-spacing-tight, -0.01px);
+}
+
+/* ── Element Plus overrides ── */
+:root {
+  --el-bg-color:          var(--bg-secondary);
+  --el-bg-color-overlay:  var(--bg-tertiary);
+  --el-text-color-primary:   var(--text-primary);
+  --el-text-color-regular:   var(--text-secondary);
+  --el-border-color:      var(--border);
+  --el-color-primary:     var(--accent);
+  --el-border-radius-base: var(--smtc-corner-ctrl-rest, 12px);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--alias-color-stroke-muted-300, rgba(0,0,0,0.10));
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--alias-color-stroke-default-350, rgba(0,0,0,0.18));
+}
+
+/* ══════════════════════════════════════════════
+   Light theme (explicit override — MAI default is already light)
+══════════════════════════════════════════════ */
+html.light {
+  --bg-primary:   #ffffff;
+  --bg-secondary: #ffffff;
+  --bg-tertiary:  #f8f4f1;
+  --bg-grouped:   #ffffff;
+  --bg-input:     #0000000d;
+  --bg-chat:      #f8f4f1;
+
+  --text-primary:   #272320;
+  --text-secondary: #4c4642;
+  --text-muted:     #b3ada8;
+
+  --border:       #0000001f;
+  --border-row:   #0000001a;
+  --border-light: #efeae7;
+}
+
+/* ══════════════════════════════════════════════
+   Dark theme  (MAI doesn't ship a dark token file,
+   so we build on the static palette — cocoa/stone darks)
+══════════════════════════════════════════════ */
+html.dark {
+  --bg-primary:   var(--static-color-stone-850);  /* #1d1a17 */
+  --bg-secondary: var(--static-color-stone-800);  /* #272320 */
+  --bg-tertiary:  var(--static-color-stone-750);  /* #322d29 */
+  --bg-grouped:   var(--static-color-stone-800);
+  --bg-input:     var(--static-color-stone-750);
+  --bg-chat:      var(--static-color-stone-850);
+
+  --text-primary:   var(--static-color-stone-100); /* #fffbf8 */
+  --text-secondary: var(--static-color-stone-300); /* #cfc9c5 */
+  --text-muted:     var(--static-color-stone-450); /* #746d68 */
+
+  --accent:       var(--alias-color-accent-350);   /* #e29c61 lighter for dark */
+  --accent-hover: var(--alias-color-accent-300);   /* #f8bc8c */
+  --accent-light: var(--alias-color-accent-650);   /* #6b3900 */
+  --accent-selected:    var(--alias-color-accent-350); /* #e29c61 */
+  --accent-selected-bg: #e29c6120;
+
+  --border:       rgba(255,255,255,0.10);
+  --border-row:   rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.07);
+
+  --msg-user-bg:   var(--static-color-stone-700); /* #3f3935 */
+  --msg-ai-bg:     transparent;
+
+  --danger:  #ef4444;
+  --success: #22c55e;
+  --warning: #f59e0b;
+
+  --card-shadow:       0 1px 3px rgba(0,0,0,0.3);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.4);
+
+  /* Element Plus dark */
+  --el-bg-color:              var(--bg-secondary);
+  --el-bg-color-overlay:      var(--bg-tertiary);
+  --el-bg-color-page:         var(--bg-primary);
+  --el-text-color-primary:    var(--text-primary);
+  --el-text-color-regular:    var(--text-secondary);
+  --el-text-color-placeholder: var(--text-muted);
+  --el-border-color:          var(--border);
+  --el-border-color-light:    var(--border-light);
+  --el-fill-color:            var(--bg-tertiary);
+  --el-fill-color-light:      var(--bg-secondary);
+  --el-fill-color-blank:      var(--bg-primary);
+  --el-color-primary:         var(--accent);
+  --el-mask-color:            rgba(0,0,0,0.6);
+  --el-dialog-bg-color:       var(--bg-secondary);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ── Window drag exclusion for interactive elements ── */
+button, a, input, textarea, select, [role="button"] {
+  -webkit-app-region: no-drag;
+}
