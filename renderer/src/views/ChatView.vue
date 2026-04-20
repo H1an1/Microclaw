@@ -2,6 +2,16 @@
   <div class="chat-view">
     <!-- Chat thread -->
     <div class="chat-thread" ref="threadRef" @scroll="handleScroll" @click="handleThreadClick">
+      <!-- [DEV] Drop analysis test trigger -->
+      <div style="padding: 12px 20px 0">
+        <button
+          style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px dashed #aaa;background:transparent;cursor:pointer;color:#888"
+          @click="dropAnalysisStore.receive([{ path: '/Users/demo/work-docs', name: 'work-docs', isDirectory: true }])"
+        >
+          [DEV] 模拟拖入文件夹
+        </button>
+      </div>
+
       <!-- Drop analysis flow -->
       <DropAnalysisFlow
         v-if="dropAnalysisStore.active"
@@ -323,7 +333,7 @@ import { useMvpTasks } from "@/composables/useMvpTasks";
 import ChatWelcome from "@/components/ChatWelcome.vue";
 import DropAnalysisFlow from "@/components/DropAnalysisFlow.vue";
 import { useDropAnalysisStore } from "@/stores/dropAnalysis";
-import agentAvatarImg from "@/assets/normal.png";
+import normalAvatarImg from "@/assets/normal.png";
 import gifSearch from "@/assets/openclaw_search_preview_transparent.gif";
 import gifBook from "@/assets/book.gif";
 import gifBino from "@/assets/binoculars.gif";
@@ -338,6 +348,10 @@ const dropAnalysisStore = useDropAnalysisStore();
 const agentStore = useAgentStore();
 const sessionStore = useSessionStore();
 const mockAgentStore = useMockAgentStore();
+const agentAvatarImg = computed(() => {
+  const agent = mockAgentStore.agents.find(a => a.id === mockAgentStore.selectedAgentId)
+  return agent?.avatar ?? normalAvatarImg
+})
 const { addTask: addMvpTask, clearTasksForAgent, scrollRequestId, selectedTaskId, tasks: mvpTaskList } = useMvpTasks();
 const CHAT_WELCOME_SEEN_KEY = "openclaw-chat-welcome-seen";
 

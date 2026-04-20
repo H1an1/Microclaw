@@ -11,10 +11,12 @@ export interface CompactEntryAppearanceOptions {
   accentColor?: string;
   themeMode?: string;
   prefersDarkColors?: boolean;
+  runGifUrl?: string;
+  paperfallGifUrl?: string;
 }
 
 export const COMPACT_ENTRY_WIDTH = 272;
-export const COMPACT_ENTRY_HEIGHT = 112;
+export const COMPACT_ENTRY_HEIGHT = 180;
 export const COMPACT_ENTRY_BOTTOM_MARGIN = 52;
 export const COMPACT_ENTRY_RESTORE_URL = "openclaw://compact-entry/restore";
 
@@ -65,6 +67,9 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
   const appName = escapeHtml(options.appName || DEFAULT_APP_NAME);
   const hint = escapeHtml(options.hint || DEFAULT_HINT);
   const accentColor = normalizeAccentColor(options.accentColor);
+  const runGifUrl = options.runGifUrl ?? '';
+  const paperfallGifUrl = options.paperfallGifUrl ?? '';
+  const hasGif = !!(runGifUrl && paperfallGifUrl);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -86,6 +91,7 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
         align-items: flex-end;
         justify-content: center;
         padding: 40px 0 8px;
+        position: relative;
       }
 
       button {
@@ -116,7 +122,7 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
       body.drag-active button,
       button:hover {
         width: 220px;
-        height: 48px;
+        height: 52px;
         background: rgba(28, 28, 28, 0.72);
         justify-content: flex-start;
         padding: 0 10px;
@@ -128,6 +134,57 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18), 0 0 0 1px ${accentColor}40;
       }
 
+      /* GIF runner — hidden at rest, revealed after pill expands */
+      .gif-runner {
+        position: absolute;
+        bottom: 42px;
+        left: calc(50% - 50px);
+        width: 100px;
+        height: 100px;
+        pointer-events: none;
+        opacity: 0;
+        animation: gif-walk 2s linear infinite;
+        animation-play-state: paused;
+        transition: opacity 0.15s ease;
+      }
+
+      .gif-runner--visible {
+        opacity: 1;
+        animation-play-state: running;
+      }
+
+      /* Walk left→right facing right, right→left mirrored; instant flip at edges */
+      @keyframes gif-walk {
+        0%     { transform: translateX(-70px) scaleX(1); }
+        49.9%  { transform: translateX(70px)  scaleX(1); }
+        50%    { transform: translateX(70px)  scaleX(-1); }
+        99.9%  { transform: translateX(-70px) scaleX(-1); }
+        100%   { transform: translateX(-70px) scaleX(1); }
+      }
+
+      .gif {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        transition: opacity 0.5s ease;
+      }
+
+      .gif-run  { opacity: 1; }
+      .gif-paper { opacity: 0; }
+
+      ${hasGif ? `
+      /* Orbs pulse only when actively processing */
+      .orb:nth-child(1) { animation: orb-pulse 1.6s ease-in-out 0s infinite; }
+      .orb:nth-child(2) { animation: orb-pulse 1.6s ease-in-out 0.3s infinite; }
+      @keyframes orb-pulse {
+        0%, 100% { opacity: 0.45; transform: scale(0.85); }
+        50%       { opacity: 1;    transform: scale(1.2); }
+      }
+      ` : ''}
+
+      /* Orbs */
       body.drag-active button .orbs,
       button:hover .orbs {
         flex: none;
@@ -155,23 +212,26 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
         width: 7px;
         height: 7px;
         border-radius: 999px;
-        background: rgba(240, 160, 32, 0.55);
-        transition: transform 260ms ease, background 140ms ease;
+        background: rgba(240, 160, 32, 0.75);
       }
 
       body.drag-active .orb,
       button:hover .orb {
+        animation: none;
         transform: scale(1.15);
         background: #F0A020;
+        opacity: 1;
       }
 
       .copy {
         min-width: 0;
+        flex: 1;
         display: none;
         flex-direction: column;
         gap: 2px;
         text-align: left;
         opacity: 0;
+        overflow: hidden;
         transition: opacity 180ms ease 80ms;
       }
 
@@ -187,19 +247,46 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
         font-weight: 600;
         letter-spacing: 0.01em;
         white-space: nowrap;
+        overflow: hidden;
       }
 
       .hint {
         display: none;
-        color: rgba(255, 255, 255, 0.46);
-        font-size: 11px;
-        line-height: 1.2;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .hint-inner {
+        display: inline-block;
+        color: rgba(255, 255, 255, 0.52);
+        font-size: 12px;
+        line-height: 1.3;
         white-space: nowrap;
+        padding-right: 32px;
       }
 
       body.drag-active .hint {
         display: block;
       }
+      ${hasGif ? 'button:hover .hint { display: block; }' : ''}
+
+      @keyframes hint-marquee {
+        0%, 18%   { transform: translateX(0); }
+        82%, 100% { transform: translateX(var(--hint-scroll, 0px)); }
+      }
+
+      ${hasGif ? `
+      body.gif-visible button:hover .orbs { display: none; }
+      body.gif-visible button:hover .title { display: none; }
+      body.gif-visible button:hover { padding-left: 12px; padding-right: 12px; gap: 0; }
+      body.gif-visible button:hover .copy {
+        gap: 0;
+        background: rgba(0, 0, 0, 0.82);
+        border-radius: 999px;
+        padding: 5px 10px;
+        flex: 1;
+      }
+      ` : ''}
 
       @keyframes reveal {
         from { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -215,9 +302,14 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
       </span>
       <span class="copy">
         <span class="title">${appName}</span>
-        <span class="hint">${hint}</span>
+        <span class="hint"><span class="hint-inner">${hint}</span></span>
       </span>
     </button>
+    ${hasGif ? `
+    <div class="gif-runner">
+      <img class="gif gif-run" src="${runGifUrl}" alt="" />
+      <img class="gif gif-paper" src="${paperfallGifUrl}" alt="" />
+    </div>` : ''}
     <script>
       const hints = [
         "欢迎回来 (ﾉ≧∀≦)ﾉ🦞",
@@ -234,13 +326,16 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
 
       const button = document.querySelector("button");
       const titleEl = button?.querySelector(".title");
-      const hintEl = button?.querySelector(".hint");
+      const hintEl = button?.querySelector(".hint-inner");
+      const hintOuter = button?.querySelector(".hint");
       const dragTitleForFolder = "把文件夹交给我";
       const dragHintForFolder = "可整理内容、总结重点、生成任务清单";
       const dragTitleForFile = "把内容交给我";
       const dragHintForFile = "可提取重点、汇总信息、生成待办";
       let lastIndex = -1;
       let dragDepth = 0;
+      const gifRunner = document.querySelector(".gif-runner");
+      let gifShowTimer = null;
 
       function resetCopy() {
         if (titleEl) titleEl.textContent = "${appName}";
@@ -304,9 +399,30 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
         do { idx = Math.floor(Math.random() * hints.length); } while (idx === lastIndex);
         lastIndex = idx;
         if (titleEl) titleEl.textContent = hints[idx];
+        // Show gif after pill expansion finishes (~260ms transition)
+        gifShowTimer = setTimeout(() => {
+          if (!gifRunner) return;
+          gifRunner.classList.add("gif-runner--visible");
+          document.body.classList.add("gif-visible");
+          // Set up marquee if hint text overflows
+          if (hintEl && hintOuter) {
+            hintEl.style.animation = 'none';
+            requestAnimationFrame(() => {
+              const overflow = hintEl.scrollWidth - hintOuter.clientWidth;
+              if (overflow > 4) {
+                hintEl.style.setProperty('--hint-scroll', '-' + overflow + 'px');
+                hintEl.style.animation = 'hint-marquee 9s ease-in-out infinite';
+              }
+            });
+          }
+        }, 270);
       });
 
       button?.addEventListener("mouseleave", () => {
+        clearTimeout(gifShowTimer);
+        gifRunner?.classList.remove("gif-runner--visible");
+        document.body.classList.remove("gif-visible");
+        if (hintEl) hintEl.style.animation = 'none';
         if (document.body.classList.contains("drag-active")) return;
         resetCopy();
       });
@@ -364,6 +480,20 @@ export function buildCompactEntryHtml(options: CompactEntryAppearanceOptions = {
           window.location.href = "${COMPACT_ENTRY_RESTORE_URL}";
         }
       });
+
+      // GIF cycling: run ↔ paperfall
+      const gifRun = document.querySelector(".gif-run");
+      const gifPaper = document.querySelector(".gif-paper");
+      if (gifRun && gifPaper) {
+        setInterval(() => {
+          gifRun.style.opacity = "0";
+          gifPaper.style.opacity = "1";
+          setTimeout(() => {
+            gifPaper.style.opacity = "0";
+            gifRun.style.opacity = "1";
+          }, 2000);
+        }, 8000);
+      }
     </script>
   </body>
 </html>`;

@@ -925,15 +925,37 @@ function positionCompactEntryWindow(): void {
   compactEntryWindow.setBounds(getCompactEntryBounds(getCompactEntryDisplayWorkArea()), false);
 }
 
+function getCompactEntryGifUrls(): { runGifUrl: string; paperfallGifUrl: string } {
+  const assetsDir = isDev
+    ? path.join(__dirname, "../renderer/src/assets")
+    : path.join(__dirname, "../renderer/dist/assets");
+  const toFileUrl = (p: string) => `file://${p.replace(/\\/g, "/")}`;
+  const runPath = path.join(assetsDir, "run.gif");
+  const paperPath = path.join(assetsDir, "paperfall.gif");
+  return {
+    runGifUrl: fs.existsSync(runPath) ? toFileUrl(runPath) : "",
+    paperfallGifUrl: fs.existsSync(paperPath) ? toFileUrl(paperPath) : "",
+  };
+}
+
+let compactEntryHintText = "";
+let compactEntryIsProcessing = false;
+
 async function refreshCompactEntryWindow(): Promise<void> {
   if (!compactEntryWindow || compactEntryWindow.isDestroyed()) return;
 
   positionCompactEntryWindow();
+  const { runGifUrl, paperfallGifUrl } = compactEntryIsProcessing
+    ? getCompactEntryGifUrls()
+    : { runGifUrl: "", paperfallGifUrl: "" };
   await compactEntryWindow.loadURL(buildCompactEntryDataUrl({
     appName: "MicroClaw",
+    hint: compactEntryHintText || undefined,
     accentColor: settingsStore.get("accentColor"),
     themeMode: settingsStore.get("themeMode"),
     prefersDarkColors: nativeTheme.shouldUseDarkColors,
+    runGifUrl,
+    paperfallGifUrl,
   }));
 }
 
@@ -1032,6 +1054,7 @@ function createCompactEntryWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      webSecurity: false,
     },
   });
 
@@ -2753,7 +2776,11 @@ function registerIpcHandlers(): void {
   });
 
   // --- Window ---
-  ipcMain.handle("window:minimize", () => enterCompactMode());
+  ipcMain.handle("window:minimize", (_event, opts?: { hint?: string; isProcessing?: boolean }) => {
+    compactEntryHintText = opts?.hint || "";
+    compactEntryIsProcessing = opts?.isProcessing ?? false;
+    return enterCompactMode();
+  });
   ipcMain.handle("window:maximize", () => {
     if (mainWindow?.isMaximized()) {
       mainWindow.unmaximize();

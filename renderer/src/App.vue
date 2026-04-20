@@ -169,7 +169,18 @@ const isMinimizing = ref(false);
 function winMinimize() {
   if (isMinimizing.value) return;
   isMinimizing.value = true;
-  (window as any).openclaw?.window?.minimize();
+  const isProcessing = chatStore.streaming || dropAnalysisStore.active;
+  const agentName = currentAgentName.value;
+  let hint: string;
+  if (dropAnalysisStore.active && dropAnalysisStore.targets.length > 0) {
+    const folderName = dropAnalysisStore.targets[0].name;
+    hint = `正在整理「${folderName}」，提取金额、日期与供应商信息...`;
+  } else if (chatStore.streaming) {
+    hint = `${agentName} 正在为你回复...`;
+  } else {
+    hint = `${agentName} 随时待命`;
+  }
+  (window as any).openclaw?.window?.minimize({ hint, isProcessing });
   setTimeout(() => { isMinimizing.value = false; }, 400);
 }
 function winMaximize() {

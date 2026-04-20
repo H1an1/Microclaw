@@ -1,67 +1,98 @@
 <template>
   <div class="new-agent-view">
-    <div class="new-agent-content">
-      <h1 class="new-agent-heading">新建 Agent</h1>
-      <p class="new-agent-sub">选择一个 Agent 类型添加到工作台</p>
 
-      <div class="fan-container" v-if="store.availablePresets.length > 0">
-        <div
-          v-for="(preset, index) in store.availablePresets"
-          :key="preset.id"
-          class="fan-card"
-          :style="{
-            '--rot': `${rotations[index]}deg`,
-            'z-index': zIndices[index],
-          }"
-          @click="handleSelect(preset)"
-        >
-          <div class="fan-card-avatar">
-            <div class="agent-avatar-large" :class="`agent-avatar--${preset.gradient}`">
-              <span class="agent-avatar-initial">{{ preset.initial }}</span>
-            </div>
-          </div>
-          <div class="fan-card-body">
-            <div class="fan-card-name">{{ preset.name }}</div>
-            <div class="fan-card-desc">{{ preset.description }}</div>
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="topbar__heading">
+        <h1 class="topbar__title">热门专家</h1>
+      </div>
+      <button class="customize-btn" @click="handleCustomize">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        自定义 Agent
+      </button>
+    </div>
+
+    <!-- Agent grid -->
+    <div class="agent-grid">
+      <div
+        v-for="preset in specialists"
+        :key="preset.id"
+        class="agent-card"
+        :class="{ 'agent-card--added': isAdded(preset.id) }"
+        @click="handleSelect(preset)"
+      >
+        <!-- Illustration -->
+        <div class="agent-card__img-area">
+          <img v-if="preset.cardImage" :src="preset.cardImage" class="agent-card__img" />
+          <div v-else class="agent-card__initial">{{ preset.initial }}</div>
+          <div v-if="isAdded(preset.id)" class="added-badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
           </div>
         </div>
-      </div>
 
-      <div v-else class="all-added">所有 Agent 已添加完毕</div>
+        <!-- Card body -->
+        <div class="agent-card__body">
+          <div class="agent-card__name">{{ preset.name }}</div>
+          <div class="agent-card__desc">{{ preset.description }}</div>
+          <div class="agent-card__tags">
+            <span v-for="tag in AGENT_TAGS[preset.id] ?? []" :key="tag" class="agent-tag">{{ tag }}</span>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="agent-card__footer">
+          <span v-if="isAdded(preset.id)" class="footer-added">已添加</span>
+          <button v-else class="footer-add">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            添加
+          </button>
+        </div>
+      </div>
     </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMockAgentStore, type MockAgent } from '@/stores/mockAgents'
+import { useMockAgentStore, ALL_PRESETS, type MockAgent } from '@/stores/mockAgents'
 
 const router = useRouter()
 const store = useMockAgentStore()
 
-// Dynamic rotation angles — evenly spread, symmetric around 0
-const rotations = computed(() => {
-  const n = store.availablePresets.length
-  if (n === 0) return []
-  if (n === 1) return [0]
-  const spread = Math.min(26, (n - 1) * 9)
-  const step = (spread * 2) / (n - 1)
-  return Array.from({ length: n }, (_, i) => -spread + i * step)
-})
+const specialists = ALL_PRESETS.slice(1)
 
-// Center card has highest z-index
-const zIndices = computed(() => {
-  const n = store.availablePresets.length
-  const mid = (n - 1) / 2
-  return Array.from({ length: n }, (_, i) =>
-    n - Math.round(Math.abs(i - mid))
-  )
-})
+const AGENT_TAGS: Record<string, string[]> = {
+  xiaohongshu: ['内容策划', '数据分析', '爆款文案'],
+  jinqianbao:  ['股票分析', '行情复盘', '持仓管理'],
+  codeMonkey:  ['代码开发', '调试优化', '代码审查'],
+  vangogh:     ['插画创作', '风格分析', '场景设计'],
+  tianluo:     ['生活规划', '饮食建议', '出行安排'],
+  singer:      ['歌词创作', '编曲灵感', '风格分析'],
+}
+
+function isAdded(id: string): boolean {
+  return !!store.agents.find(a => a.id === id)
+}
 
 function handleSelect(preset: MockAgent) {
+  if (isAdded(preset.id)) {
+    store.selectAgent(preset.id)
+    router.push(`/chat/${preset.id}`)
+    return
+  }
   store.addAgent(preset)
-  router.push('/chat')
+  router.push(`/chat/${preset.id}`)
+}
+
+function handleCustomize() {
+  // placeholder — future custom agent creation flow
 }
 </script>
 
@@ -71,150 +102,237 @@ function handleSelect(preset: MockAgent) {
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 28px 36px 40px;
 }
 
-.new-agent-content {
-  flex: 1;
-  overflow: hidden;
-  padding: 44px 48px 0;
+/* ── Top bar ── */
+.topbar {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-shrink: 0;
 }
 
-.new-agent-heading {
+.back-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.back-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.topbar__heading {
+  flex: 1;
+}
+
+.topbar__title {
   font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
-  margin-bottom: 6px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0 0 5px;
 }
 
-.new-agent-sub {
+.topbar__sub {
   font-size: 13px;
   color: var(--text-muted);
-  margin-bottom: 48px;
+  margin: 0;
 }
 
-/* ── Fan container ── */
-.fan-container {
-  position: relative;
-  width: 100%;
-  max-width: 800px;
-  height: 380px;
-  flex-shrink: 0;
-}
-
-/* ── Individual fan card ── */
-.fan-card {
-  position: absolute;
-  left: 50%;
-  bottom: 40px;
-  width: 168px;
-  height: 258px;
-  margin-left: -84px;
-  transform-origin: center bottom;
-  transform: rotate(var(--rot));
-  transition: transform 0.28s cubic-bezier(0.34, 1.5, 0.64, 1),
-              box-shadow 0.28s ease;
+.customize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
   cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
 
-  background: #fdfcfb;
-  border-radius: 20px;
-  border: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+.customize-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
 
+/* ── Grid ── */
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+/* ── Card ── */
+.agent-card {
+  border-radius: 18px;
+  border: 0.5px solid var(--border);
+  background: var(--bg-tertiary);
+  overflow: hidden;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 24px 16px 20px;
-  gap: 0;
+  transition: background 0.15s, box-shadow 0.2s, transform 0.2s;
 }
 
-.fan-card:hover {
-  transform: rotate(var(--rot)) translateY(-38px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14), 0 4px 10px rgba(0, 0, 0, 0.08);
-  z-index: 100 !important;
+.agent-card:hover {
+  background: #ede8e4;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
 }
 
-/* ── Avatar ── */
-.fan-card-avatar {
-  flex-shrink: 0;
-  margin-bottom: 18px;
+html.dark .agent-card:hover {
+  background: var(--bg-secondary);
 }
 
-.agent-avatar-large {
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
+.agent-card--added {
+  opacity: 0.65;
+}
+
+.agent-card--added:hover {
+  opacity: 1;
+}
+
+/* ── Illustration ── */
+.agent-card__img-area {
   position: relative;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   overflow: hidden;
+}
+
+.agent-card__img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  object-position: bottom center;
+  flex-shrink: 0;
+}
+
+.agent-card__initial {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.added-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(52, 199, 89, 0.9);
+  color: #fff;
   display: grid;
   place-items: center;
 }
 
-.agent-avatar-large::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-
-.agent-avatar-large::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: white;
-  filter: url(#grain);
-  opacity: 0.5;
-  mix-blend-mode: multiply;
-}
-
-.agent-avatar--rose::before   { background: radial-gradient(ellipse 80% 70% at 28% 30%, #ff5050 0%, transparent 58%), radial-gradient(ellipse 65% 80% at 72% 68%, #ff80a0 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 55% 85%, #ff3858 0%, transparent 50%), #e83848; }
-.agent-avatar--gold::before   { background: radial-gradient(ellipse 100% 90% at 30% 30%, #ffe000 0%, #ffcc00 45%, transparent 72%), radial-gradient(ellipse 55% 65% at 80% 70%, #ff6090 0%, transparent 45%), radial-gradient(ellipse 55% 45% at 55% 88%, #ff3060 0%, transparent 45%), #e0a000; }
-.agent-avatar--ocean::before  { background: radial-gradient(ellipse 85% 70% at 25% 28%, #0088ff 0%, transparent 55%), radial-gradient(ellipse 70% 85% at 72% 65%, #10d8b0 0%, transparent 55%), radial-gradient(ellipse 75% 55% at 55% 80%, #60f050 0%, transparent 60%), #1098d8; }
-.agent-avatar--aurora::before { background: radial-gradient(ellipse 90% 70% at 25% 30%, #9060f8 0%, transparent 55%), radial-gradient(ellipse 70% 90% at 75% 70%, #d850d0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 55% 20%, #f090a0 0%, transparent 60%), #9858e8; }
-.agent-avatar--sage::before   { background: radial-gradient(ellipse 85% 70% at 28% 28%, #18c058 0%, transparent 55%), radial-gradient(ellipse 70% 85% at 70% 68%, #50d868 0%, transparent 55%), radial-gradient(ellipse 75% 55% at 55% 82%, #c0f020 0%, transparent 60%), #38b848; }
-
-.agent-avatar-initial {
-  position: relative;
-  z-index: 1;
-  font-size: 34px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  letter-spacing: -0.02em;
-  line-height: 1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-}
-
-/* ── Card text ── */
-.fan-card-body {
-  text-align: center;
+/* ── Body ── */
+.agent-card__body {
+  padding: 12px 16px 8px;
+  margin-top: -20px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
 }
 
-.fan-card-name {
-  font-size: 16px;
+.agent-card__name {
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  margin-bottom: 7px;
 }
 
-.fan-card-desc {
-  font-size: 11.5px;
+.agent-card__desc {
+  font-size: 12px;
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
-.all-added {
-  margin-top: 80px;
+.agent-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.agent-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
   color: var(--text-muted);
-  font-size: 14px;
+  background: rgba(18, 24, 32, 0.05);
+  border: 1px solid var(--border);
+}
+
+html.dark .agent-tag {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Footer ── */
+.agent-card__footer {
+  padding: 10px 16px 16px;
+}
+
+.footer-added {
+  font-size: 12px;
+  color: #34c759;
+  font-weight: 500;
+}
+
+.footer-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.agent-card:hover .footer-add {
+  background: #1a1a1a;
+  border-color: transparent;
+  color: #fff;
 }
 </style>

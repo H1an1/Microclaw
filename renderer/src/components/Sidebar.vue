@@ -435,11 +435,7 @@ watch(
 )
 
 function addAgent() {
-  const next = mockAgentStore.availablePresets[0]
-  if (next) {
-    mockAgentStore.addAgent(next)
-    router.push('/chat')
-  }
+  router.push('/new-agent')
 }
 
 // ── Actions ──

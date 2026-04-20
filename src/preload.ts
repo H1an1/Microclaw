@@ -197,7 +197,7 @@ contextBridge.exposeInMainWorld("openclaw", {
 
   // --- Window ---
   window: {
-    minimize: () => ipcRenderer.invoke("window:minimize"),
+    minimize: (opts?: { hint?: string; isProcessing?: boolean }) => ipcRenderer.invoke("window:minimize", opts),
     maximize: () => ipcRenderer.invoke("window:maximize"),
     close: () => ipcRenderer.invoke("window:close"),
   },
