@@ -17,6 +17,17 @@ const router = createRouter({
       component: () => import("@/views/ChatView.vue"),
     },
     {
+      path: "/profile/:agentId",
+      name: "profile",
+      redirect: (to) => {
+        const agentId = typeof to.params.agentId === 'string' ? to.params.agentId : ''
+        return {
+          path: `/chat/${agentId}`,
+          query: { panel: 'profile', profileAgentId: agentId },
+        }
+      },
+    },
+    {
       path: "/settings/:section?",
       name: "settings",
       component: () => import("@/views/SettingsView.vue"),

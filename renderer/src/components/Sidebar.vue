@@ -14,10 +14,12 @@
             :class="{ selected: isMvpAgentSelected }"
             @click="handleMvpAgentSelect"
           >
-            <div class="agent-avatar" :class="defaultAgent.avatar ? '' : `agent-avatar--${defaultAgent.gradient}`">
-              <img v-if="defaultAgent.avatar" :src="defaultAgent.avatar" class="agent-avatar-img" />
-              <span v-else class="agent-avatar-initial">{{ defaultAgent.initial ?? defaultAgent.name[0]?.toUpperCase() }}</span>
-            </div>
+            <button class="agent-avatar-button" type="button" @click.stop="openAgentProfile(defaultAgent.id)">
+              <div class="agent-avatar" :class="defaultAgent.avatar ? '' : `agent-avatar--${defaultAgent.gradient}`">
+                <img v-if="defaultAgent.avatar" :src="defaultAgent.avatar" class="agent-avatar-img" />
+                <span v-else class="agent-avatar-initial">{{ defaultAgent.initial ?? defaultAgent.name[0]?.toUpperCase() }}</span>
+              </div>
+            </button>
             <div class="agent-info">
               <span class="agent-name">{{ defaultAgent.name }}</span>
               <span class="agent-desc">{{ defaultAgent.description }}</span>
@@ -104,10 +106,12 @@
         <div v-for="agent in agents" :key="agent.id" class="agent-row">
           <!-- Agent header (always visible) -->
           <div class="agent-header" :class="{ selected: isAgentHeaderSelected(agent.id) }" @click="selectAgent(agent.id)">
-            <div class="agent-avatar" :class="agent.avatar ? '' : `agent-avatar--${agent.gradient}`">
-              <img v-if="agent.avatar" :src="agent.avatar" class="agent-avatar-img" />
-              <span v-else class="agent-avatar-initial">{{ agent.initial ?? agent.name[0]?.toUpperCase() }}</span>
-            </div>
+            <button class="agent-avatar-button" type="button" @click.stop="openAgentProfile(agent.id)">
+              <div class="agent-avatar" :class="agent.avatar ? '' : `agent-avatar--${agent.gradient}`">
+                <img v-if="agent.avatar" :src="agent.avatar" class="agent-avatar-img" />
+                <span v-else class="agent-avatar-initial">{{ agent.initial ?? agent.name[0]?.toUpperCase() }}</span>
+              </div>
+            </button>
             <div class="agent-info">
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-desc">{{ agent.description }}</span>
@@ -329,7 +333,7 @@ const mvpNavItems = computed(() => [
 const isMvpAgentSelected = computed(() => {
   const hasSelectedMvpTab = mvpNavItems.value.some((item) => item.selected)
   const hasSelectedTask = !!selectedTaskId.value && mvpTasks.value.some(t => t.id === selectedTaskId.value)
-  return !hasSelectedMvpTab && !hasSelectedTask && route.path.startsWith('/chat')
+  return !hasSelectedMvpTab && !hasSelectedTask && (route.path.startsWith('/chat') || route.path.startsWith('/profile'))
 })
 
 function isAgentHeaderSelected(agentId: string): boolean {
@@ -341,6 +345,15 @@ function selectAgent(id: string) {
   mockAgentStore.selectAgent(id)
   selectTask(null)
   router.push('/chat')
+}
+
+function openAgentProfile(agentId: string) {
+  mockAgentStore.selectAgent(agentId)
+  selectTask(null)
+  router.push({
+    path: `/chat/${agentId}`,
+    query: { panel: 'profile', profileAgentId: agentId },
+  })
 }
 
 function handleMvpAgentSelect() {
@@ -630,7 +643,6 @@ html.dark .new-agent-btn {
 .agent-row {
   border-radius: 10px;
   margin-bottom: 2px;
-  overflow: hidden;
   transition: background 0.15s;
 }
 
@@ -664,6 +676,23 @@ html.dark .new-agent-btn {
   overflow: hidden;
 }
 
+.agent-avatar-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.agent-avatar-button:focus,
+.agent-avatar-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .agent-avatar-img {
   width: 100%;
   height: 100%;
@@ -689,6 +718,11 @@ html.dark .new-agent-btn {
   filter: url(#grain);
   opacity: 0.5;
   mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.agent-avatar {
+  cursor: pointer;
 }
 
 .agent-avatar--aurora::before { background: radial-gradient(ellipse 90% 70% at 25% 30%, #9a7fff 0%, transparent 55%), radial-gradient(ellipse 70% 90% at 75% 70%, #e050e0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 55% 20%, #ffaa44 0%, transparent 60%), #a060f0; }

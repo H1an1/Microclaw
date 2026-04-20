@@ -162,6 +162,7 @@ export default {
   "settings.callsSuffix": "次调用",
   "settings.inputSuffix": "输入",
   "settings.outputSuffix": "输出",
+  "settings.usageGatewayDisconnected": "Gateway 未连接，暂时无法读取用量数据。连接恢复后会自动刷新。",
   "settings.skillManagement": "技能管理",
   "settings.builtinSkills": "内置技能",
   "settings.enabledCount": "已启用",

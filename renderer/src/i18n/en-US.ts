@@ -161,6 +161,7 @@ export default {
   "settings.callsSuffix": "calls",
   "settings.inputSuffix": "input",
   "settings.outputSuffix": "output",
+  "settings.usageGatewayDisconnected": "The gateway is not connected, so usage data is temporarily unavailable. It will refresh automatically once the connection returns.",
   "settings.skillManagement": "Skill Management",
   "settings.builtinSkills": "Built-in Skills",
   "settings.enabledCount": "enabled",

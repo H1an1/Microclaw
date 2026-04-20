@@ -11,7 +11,7 @@
   />
 
   <!-- Main app (shown after first successful WS connection) -->
-  <div v-else class="app-layout">
+  <div v-else :class="['app-layout', { 'app-minimizing': isMinimizing }]">
     <PrimaryNav />
     <Sidebar />
     <main class="main-content">
@@ -37,11 +37,19 @@
           </button>
         </div>
       </div>
-      <router-view v-slot="{ Component }">
-        <keep-alive include="ChatView">
-          <component :is="Component" />
-        </keep-alive>
-      </router-view>
+      <div class="main-content__body" :class="{ 'main-content__body--panel-open': !!activeProfileAgentId }">
+        <div class="main-content__view">
+          <router-view v-slot="{ Component }">
+            <keep-alive include="ChatView">
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
+        </div>
+
+        <transition name="profile-panel-slide">
+          <AgentProfilePanel v-if="activeProfileAgentId" :agent-id="activeProfileAgentId" class="main-content__panel" />
+        </transition>
+      </div>
     </main>
   </div>
 
@@ -106,6 +114,7 @@ import Sidebar from "@/components/Sidebar.vue";
 import PrimaryNav from "@/components/PrimaryNav.vue";
 import GatewayLoading from "@/components/GatewayLoading.vue";
 import PermissionDialog from "@/components/PermissionDialog.vue";
+import AgentProfilePanel from "@/components/AgentProfilePanel.vue";
 import { useGatewayStore } from "@/stores/gateway";
 import { useChatStore } from "@/stores/chat";
 import { useSessionStore } from "@/stores/sessions";
@@ -125,6 +134,13 @@ const route = useRoute();
 const currentAgentName = computed(() => {
   const id = mockAgentStore.selectedAgentId;
   return mockAgentStore.agents.find(a => a.id === id)?.name ?? 'MicroClaw';
+});
+
+const activeProfileAgentId = computed(() => {
+  const panel = Array.isArray(route.query.panel) ? route.query.panel[0] : route.query.panel;
+  const agentId = Array.isArray(route.query.profileAgentId) ? route.query.profileAgentId[0] : route.query.profileAgentId;
+  if (panel !== 'profile' || typeof agentId !== 'string' || !agentId) return '';
+  return agentId;
 });
 
 const currentPageTitle = computed(() => {
@@ -147,7 +163,13 @@ const currentPageTitle = computed(() => {
 });
 
 const isMaximized = ref(false);
-function winMinimize() { (window as any).openclaw?.window?.minimize(); }
+const isMinimizing = ref(false);
+function winMinimize() {
+  if (isMinimizing.value) return;
+  isMinimizing.value = true;
+  (window as any).openclaw?.window?.minimize();
+  setTimeout(() => { isMinimizing.value = false; }, 400);
+}
 function winMaximize() {
   (window as any).openclaw?.window?.maximize();
   isMaximized.value = !isMaximized.value;
@@ -468,6 +490,40 @@ onUnmounted(() => {
   background: var(--bg-secondary);
 }
 
+.main-content__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.main-content__view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.main-content__panel {
+  width: 420px;
+  min-width: 360px;
+  max-width: 38vw;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+.profile-panel-slide-enter-active,
+.profile-panel-slide-leave-active {
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.profile-panel-slide-enter-from,
+.profile-panel-slide-leave-to {
+  transform: translateX(24px);
+  opacity: 0;
+}
+
 .main-titlebar {
   height: 44px;
   flex-shrink: 0;
@@ -512,7 +568,47 @@ onUnmounted(() => {
   color: var(--text-primary);
 }
 
+@media (max-width: 1180px) {
+  .main-content__panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 100%);
+    max-width: 100%;
+    box-shadow: -16px 0 40px rgba(18, 24, 32, 0.12);
+    z-index: 4;
+  }
+}
+
 .win-btn--close:hover {
   background: #c42b1c;
   color: #ffffff;
+}
+
+.app-layout {
+  transform-origin: bottom center;
+}
+
+.app-minimizing {
+  animation: shrink-to-mini 300ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes shrink-to-mini {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+  60% {
+    opacity: 0.6;
+    transform: scale(0.45) translateY(24px);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.08) translateY(48px);
+    filter: blur(4px);
+  }
 }</style>

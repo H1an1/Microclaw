@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, dialog, nativeTheme } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, shell, dialog, nativeTheme, screen } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import * as http from "http";
@@ -10,6 +10,7 @@ import { verifySkillIntegrity, generateAndSignSnapshot, getSkillSourceDirs, type
 import { ToolSandbox } from "./tool-sandbox";
 import { t as mainT } from "./i18n";
 import { getOpenClawStateDir, loadStateDirEnv, resolveNodePath, resolveOpenClawEntry } from "./path-resolver";
+import { buildCompactEntryDataUrl, COMPACT_ENTRY_RESTORE_URL, getCompactEntryBounds } from "./compact-entry";
 import {
   type GatewayStatus,
   CREATE_NO_WINDOW,
@@ -128,6 +129,9 @@ let isQuitting = false;
 let forceHardRestart = false;
 
 let mainWindow: BrowserWindow | null = null;
+let compactEntryWindow: BrowserWindow | null = null;
+let preCompactBounds: Electron.Rectangle | null = null;
+let preCompactWasMaximized = false;
 let gatewayProcess: ChildProcess | null = null;
 let gwClient: GatewayClient | null = null;
 let gatewayPort = 0;
@@ -897,6 +901,151 @@ function _getRendererURL(): string {
   return `file://${path.join(__dirname, "../renderer/dist/index.html")}`;
 }
 
+function getCompactEntryDisplayWorkArea(): Electron.Rectangle {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+  }
+  return screen.getPrimaryDisplay().workArea;
+}
+
+function hideCompactEntryWindow(): void {
+  if (compactEntryWindow && !compactEntryWindow.isDestroyed()) {
+    compactEntryWindow.hide();
+  }
+}
+
+function positionCompactEntryWindow(): void {
+  if (!compactEntryWindow || compactEntryWindow.isDestroyed()) return;
+  compactEntryWindow.setBounds(getCompactEntryBounds(getCompactEntryDisplayWorkArea()), false);
+}
+
+async function refreshCompactEntryWindow(): Promise<void> {
+  if (!compactEntryWindow || compactEntryWindow.isDestroyed()) return;
+
+  positionCompactEntryWindow();
+  await compactEntryWindow.loadURL(buildCompactEntryDataUrl({
+    appName: "MicroClaw",
+    accentColor: settingsStore.get("accentColor"),
+    themeMode: settingsStore.get("themeMode"),
+    prefersDarkColors: nativeTheme.shouldUseDarkColors,
+  }));
+}
+
+function showMainWindow(): void {
+  hideCompactEntryWindow();
+
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  if (preCompactBounds) {
+    mainWindow.setBounds(preCompactBounds, false);
+  }
+
+  const shouldMaximize = preCompactWasMaximized;
+  preCompactBounds = null;
+  preCompactWasMaximized = false;
+
+  mainWindow.show();
+  if (shouldMaximize) {
+    mainWindow.maximize();
+  }
+  mainWindow.focus();
+}
+
+function createCompactEntryWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    ...getCompactEntryBounds(getCompactEntryDisplayWorkArea()),
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: false,
+    focusable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    fullscreenable: false,
+    roundedCorners: true,
+    acceptFirstMouse: true,
+    hasShadow: false,
+    hiddenInMissionControl: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  win.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
+  if (process.platform === "darwin") {
+    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: false });
+  }
+
+  win.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      showMainWindow();
+    }
+  });
+
+  win.on("closed", () => {
+    if (compactEntryWindow === win) {
+      compactEntryWindow = null;
+    }
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    event.preventDefault();
+    if (url === COMPACT_ENTRY_RESTORE_URL) {
+      showMainWindow();
+    }
+  });
+
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+  return win;
+}
+
+async function showCompactEntryWindow(): Promise<void> {
+  if (!compactEntryWindow || compactEntryWindow.isDestroyed()) {
+    compactEntryWindow = createCompactEntryWindow();
+  }
+
+  await refreshCompactEntryWindow();
+
+  if (typeof compactEntryWindow.showInactive === "function") {
+    compactEntryWindow.showInactive();
+  } else {
+    compactEntryWindow.show();
+  }
+}
+
+async function enterCompactMode(): Promise<void> {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (mainWindow.isFullScreen()) {
+    mainWindow.once("leave-full-screen", () => {
+      enterCompactMode().catch((err) => console.error("[compact-entry] failed after leaving fullscreen:", err));
+    });
+    mainWindow.setFullScreen(false);
+    return;
+  }
+
+  preCompactWasMaximized = mainWindow.isMaximized();
+  preCompactBounds = preCompactWasMaximized
+    ? mainWindow.getNormalBounds()
+    : mainWindow.getBounds();
+
+  mainWindow.hide();
+  await showCompactEntryWindow();
+}
+
 // ---------------------------------------------------------------------------
 // Window creation
 // ---------------------------------------------------------------------------
@@ -932,15 +1081,25 @@ function createMainWindow(): BrowserWindow {
     (win as any).setWindowButtonVisibility(false);
   }
 
+  // Avoid persisting temporary setup-window bounds while we resize/center programmatically.
+  let isSuppressingBoundsSync = false;
+
   function resizeWindow(width: number, height: number, resizable: boolean, afterResize?: () => void): void {
     const applyResize = () => {
-      if (win.isMaximized()) {
-        win.unmaximize();
+      isSuppressingBoundsSync = true;
+      try {
+        if (win.isMaximized()) {
+          win.unmaximize();
+        }
+        win.setResizable(resizable);
+        win.setSize(width, height);
+        win.center();
+        afterResize?.();
+      } finally {
+        setTimeout(() => {
+          isSuppressingBoundsSync = false;
+        }, 0);
       }
-      win.setResizable(resizable);
-      win.setSize(width, height);
-      win.center();
-      afterResize?.();
     };
 
     if (win.isFullScreen()) {
@@ -985,17 +1144,31 @@ function createMainWindow(): BrowserWindow {
   });
 
   const saveBounds = () => {
+    if (isSuppressingBoundsSync) return;
     if (!win.isMinimized() && !win.isMaximized()) {
       store.set("windowBounds", win.getBounds());
     }
   };
   win.on("resize", saveBounds);
   win.on("move", saveBounds);
+  win.on("show", () => {
+    hideCompactEntryWindow();
+  });
+  win.on("closed", () => {
+    if (mainWindow === win) {
+      mainWindow = null;
+    }
+    if (compactEntryWindow && !compactEntryWindow.isDestroyed()) {
+      compactEntryWindow.destroy();
+    }
+    compactEntryWindow = null;
+  });
 
   // Minimize to tray instead of closing
   win.on("close", (e) => {
     if (!isQuitting) {
       e.preventDefault();
+      hideCompactEntryWindow();
       win.hide();
     }
   });
@@ -2518,10 +2691,15 @@ function registerIpcHandlers(): void {
           : { color: "#ffffff", symbolColor: "#1e1f25", height: 36 }
       );
     }
+    if ((key === 'themeMode' || key === 'accentColor') && compactEntryWindow && !compactEntryWindow.isDestroyed()) {
+      refreshCompactEntryWindow().catch((err) =>
+        console.error("[compact-entry] failed to refresh appearance:", err)
+      );
+    }
   });
 
   // --- Window ---
-  ipcMain.handle("window:minimize", () => mainWindow?.minimize());
+  ipcMain.handle("window:minimize", () => enterCompactMode());
   ipcMain.handle("window:maximize", () => {
     if (mainWindow?.isMaximized()) {
       mainWindow.unmaximize();
@@ -3345,11 +3523,7 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    showMainWindow();
     // Ensure gateway is alive when user re-opens the app
     ensureGatewayConnected().catch((err) =>
       console.error("[second-instance] gateway reconnect failed:", err)
@@ -3365,12 +3539,13 @@ app.whenReady().then(async () => {
 
   mainWindow = createMainWindow();
 
+  screen.on("display-metrics-changed", positionCompactEntryWindow);
+  screen.on("display-added", positionCompactEntryWindow);
+  screen.on("display-removed", positionCompactEntryWindow);
+
   const trayCallbacks = {
     onShowWindow: () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+      showMainWindow();
       // Ensure gateway is alive when user shows window from tray
       ensureGatewayConnected().catch((err) =>
         console.error("[tray-show] gateway reconnect failed:", err)
@@ -3436,19 +3611,23 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   isQuitting = true;
   if (healthCheckInterval) clearInterval(healthCheckInterval);
+  screen.removeListener("display-metrics-changed", positionCompactEntryWindow);
+  screen.removeListener("display-added", positionCompactEntryWindow);
+  screen.removeListener("display-removed", positionCompactEntryWindow);
   // Clean up skill file watchers
   for (const w of skillWatchers) { try { w.close(); } catch {} }
   skillWatchers = [];
   if (watcherDebounceTimer) { clearTimeout(watcherDebounceTimer); watcherDebounceTimer = null; }
   destroyTray();
+  if (compactEntryWindow && !compactEntryWindow.isDestroyed()) {
+    compactEntryWindow.destroy();
+  }
   gwClient?.stop();
   stopGatewayProcess();
 });
 
 app.on("activate", () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show();
-  }
+  showMainWindow();
   ensureGatewayConnected().catch((err) =>
     console.error("[activate] gateway reconnect failed:", err)
   );

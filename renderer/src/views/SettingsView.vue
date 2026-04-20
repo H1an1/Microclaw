@@ -777,7 +777,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed, nextTick } from "vue";
+import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useGatewayStore } from "@/stores/gateway";
 import { useChatStore } from "@/stores/chat";
@@ -785,6 +785,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import microclawLogo from "../../../assets/microclaw.png";
 import { t, setLocale } from "@/i18n";
 import type { Locale } from "@/i18n";
+import { isGatewayDisconnectedMessage, normalizeIpcErrorMessage } from "@/utils/ipc-errors";
 
 const router = useRouter();
 const gateway = useGatewayStore();
@@ -1226,6 +1227,7 @@ interface UsageStats {
 const usageData = ref<UsageStats | null>(null);
 const usageLoading = ref(false);
 const usageError = ref("");
+let unsubUsageWsConnected: (() => void) | null = null;
 
 const usageModelList = computed(() => {
   if (!usageData.value) return [];
@@ -1252,9 +1254,19 @@ async function loadUsage() {
   usageLoading.value = true;
   usageError.value = "";
   try {
+    const connected = await window.openclaw.chat.isConnected();
+    if (!connected) {
+      usageError.value = t('settings.usageGatewayDisconnected');
+      usageData.value = null;
+      return;
+    }
+
     usageData.value = await (window as any).openclaw.usage.getStats();
   } catch (err: any) {
-    usageError.value = err.message || t('settings.usageLoadFailed');
+    const message = normalizeIpcErrorMessage(err, t('settings.usageLoadFailed'));
+    usageError.value = isGatewayDisconnectedMessage(message)
+      ? t('settings.usageGatewayDisconnected')
+      : message;
     usageData.value = null;
   } finally {
     usageLoading.value = false;
@@ -1367,6 +1379,12 @@ watch(activeSection, (v) => {
 });
 
 onMounted(async () => {
+  unsubUsageWsConnected = window.openclaw.gateway.onWsConnected(() => {
+    if (activeSection.value === "usage" && !usageLoading.value) {
+      void loadUsage();
+    }
+  });
+
   stateDir.value = await window.openclaw.config.getStateDir();
 
   // Load persisted app settings
@@ -1445,6 +1463,10 @@ onMounted(async () => {
   } catch {
     // Skills listing not available
   }
+});
+
+onUnmounted(() => {
+  unsubUsageWsConnected?.();
 });
 
 // --- Model & Gateway actions ---
