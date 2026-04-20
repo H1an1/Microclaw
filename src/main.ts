@@ -1124,7 +1124,7 @@ function createMainWindow(): BrowserWindow {
   // Expand to full main-app size when setup completes
   ipcMain.handle("setup:open-main", () => {
     const bounds = (savedBounds && savedBounds.width > 600) ? savedBounds : null;
-    resizeWindow(bounds?.width || 1000, bounds?.height || 800, true, () => {
+    resizeWindow(bounds?.width || 1200, bounds?.height || 800, true, () => {
       // Restore native window controls for the main app
       if (isMac && typeof (win as any).setWindowButtonVisibility === "function") {
         (win as any).setWindowButtonVisibility(true);

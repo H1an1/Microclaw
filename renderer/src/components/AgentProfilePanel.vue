@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="panel-header">
       <div class="panel-header__left">
-        <div class="panel-avatar" :class="agent.avatar ? '' : `panel-avatar--${agent.gradient}`">
+        <div class="panel-avatar" :class="agent.avatar ? '' : `panel-avatar--${agent.gradient}`" @click="cycleMockState" title="切换状态">
           <img v-if="agent.avatar" :src="agent.avatar" :alt="agent.name" class="panel-avatar__img" />
           <span v-else class="panel-avatar__initial">{{ agent.initial ?? agent.name[0]?.toUpperCase() }}</span>
         </div>
@@ -13,8 +13,9 @@
         </div>
       </div>
       <button class="panel-close" type="button" @click="closePanel" aria-label="关闭">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 17 18 12 13 7" />
+          <polyline points="6 17 11 12 6 7" />
         </svg>
       </button>
     </div>
@@ -23,10 +24,10 @@
       <!-- Agent's Space -->
       <div class="agent-scene" :class="{ 'agent-scene--crashed': isCrashed }">
         <div class="agent-scene__floor"></div>
-        <img :src="crashGif" class="agent-scene__gif" alt="" />
+        <img :src="mockState.gif" class="agent-scene__gif" alt="" />
         <div class="agent-scene__state-badge" :class="{ 'agent-scene__state-badge--crashed': isCrashed }">
           <span class="agent-scene__dot"></span>
-          {{ isCrashed ? 'Token 已耗尽' : (usageLoading ? '加载中…' : '正常运行') }}
+          {{ mockState.badge }}
         </div>
       </div>
 
@@ -149,6 +150,7 @@ import { useMockAgentStore } from '@/stores/mockAgents'
 import { t } from '@/i18n'
 import { isGatewayDisconnectedMessage, normalizeIpcErrorMessage } from '@/utils/ipc-errors'
 import crashGif from '@/assets/crash.gif'
+import bookGif from '@/assets/book.gif'
 
 interface UsageStats {
   totalSpend: number;
@@ -231,21 +233,49 @@ const FAKE_SKILLS = [
   { name: 'mcporter' },
 ]
 
-const FAKE_DATA = {
-  totalTokens: 1284300,
-  totalPromptTokens: 942100,
-  totalCompletionTokens: 342200,
-  cacheReadTokens: 186400,
-  remainingTokensToday: 0,
-  totalRequests: 1247,
-  sessionCount: 38,
-  toolCalls: 312,
-  totalSpend: 10.00,
-  maxBudget: 10.00,
-  budgetResetAt: '2025-02-01T00:00:00Z',
-}
+const MOCK_STATES = [
+  {
+    key: 'crashed',
+    gif: crashGif,
+    badge: 'Token 已耗尽',
+    data: {
+      totalTokens: 1284300,
+      totalPromptTokens: 942100,
+      totalCompletionTokens: 342200,
+      cacheReadTokens: 186400,
+      remainingTokensToday: 0,
+      totalRequests: 1247,
+      sessionCount: 38,
+      toolCalls: 312,
+      totalSpend: 10.00,
+      maxBudget: 10.00,
+      budgetResetAt: '2025-02-01T00:00:00Z',
+    },
+  },
+  {
+    key: 'working',
+    gif: bookGif,
+    badge: '工作中',
+    data: {
+      totalTokens: 538200,
+      totalPromptTokens: 391400,
+      totalCompletionTokens: 146800,
+      cacheReadTokens: 72300,
+      remainingTokensToday: 61800,
+      totalRequests: 524,
+      sessionCount: 14,
+      toolCalls: 98,
+      totalSpend: 3.52,
+      maxBudget: 10.00,
+      budgetResetAt: null,
+    },
+  },
+]
 
-const displayData = computed(() => usageData.value ?? FAKE_DATA)
+const mockStateIndex = ref(0)
+const mockState = computed(() => MOCK_STATES[mockStateIndex.value])
+
+const displayData = computed(() => usageData.value ?? mockState.value.data)
 
 const budgetProgress = computed(() => {
   const d = displayData.value
@@ -253,7 +283,7 @@ const budgetProgress = computed(() => {
   return Math.min(100, (d.totalSpend / d.maxBudget) * 100)
 })
 
-const isCrashed = computed(() => budgetProgress.value >= 100)
+const isCrashed = computed(() => mockState.value.key === 'crashed')
 
 const skillsExpanded = ref(false)
 const SKILLS_PREVIEW_COUNT = 9
@@ -279,6 +309,10 @@ function closePanel() {
   delete nextQuery.panel
   delete nextQuery.profileAgentId
   router.replace({ path: route.path, query: nextQuery })
+}
+
+function cycleMockState() {
+  mockStateIndex.value = (mockStateIndex.value + 1) % MOCK_STATES.length
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -347,12 +381,7 @@ html.dark .agent-profile-panel {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(18, 24, 32, 0.07);
   flex-shrink: 0;
-}
-
-html.dark .panel-header {
-  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .panel-header__left {
@@ -394,6 +423,7 @@ html.dark .panel-header {
   place-items: center;
   flex-shrink: 0;
   position: relative;
+  cursor: pointer;
 }
 
 .panel-avatar::before {
@@ -432,24 +462,21 @@ html.dark .panel-header {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: rgba(18, 24, 32, 0.06);
+  background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .panel-close:hover {
-  background: rgba(18, 24, 32, 0.1);
-}
-
-html.dark .panel-close {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(18, 24, 32, 0.07);
+  color: var(--text-primary);
 }
 
 html.dark .panel-close:hover {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Scroll area */
