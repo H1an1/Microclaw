@@ -120,6 +120,7 @@ import { useChatStore } from "@/stores/chat";
 import { useSessionStore } from "@/stores/sessions";
 import { useTaskStore } from "@/stores/tasks";
 import { useMockAgentStore } from "@/stores/mockAgents";
+import { useDropAnalysisStore } from "@/stores/dropAnalysis";
 import { t, setLocale } from "@/i18n";
 
 const gateway = useGatewayStore();
@@ -127,6 +128,7 @@ const chatStore = useChatStore();
 const sessionStore = useSessionStore();
 const taskStore = useTaskStore();
 const mockAgentStore = useMockAgentStore();
+const dropAnalysisStore = useDropAnalysisStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -226,6 +228,29 @@ interface PermissionRequestData {
 const permissionQueue = ref<PermissionRequestData[]>([]);
 const currentPermission = computed(() => permissionQueue.value.length > 0 ? permissionQueue.value[0] : null);
 
+function buildCompactEntryDraft(targets: CompactEntryDropTarget[]): string {
+  const preferredTargets = targets.filter((target) => target.isDirectory);
+  const effectiveTargets = preferredTargets.length > 0 ? preferredTargets : targets;
+
+  if (effectiveTargets.length === 1) {
+    const [target] = effectiveTargets;
+    const kind = target.isDirectory ? "文件夹" : "文件";
+    return `我刚拖进来了一个${kind}「${target.name}」。请先看看里面都有什么，并告诉我你可以怎么帮我处理它，比如整理内容、总结重点、提取信息或生成任务清单。\n\n路径：${target.path}`;
+  }
+
+  const label = preferredTargets.length === effectiveTargets.length ? "文件夹" : "项目";
+  const lines = effectiveTargets.map((target) => `- ${target.name}（${target.path}）`).join("\n");
+  return `我刚拖进来了这些${label}：\n${lines}\n\n请先概览它们分别是什么，并告诉我你可以怎么帮我整理、总结或提取重点。`;
+}
+
+async function handleCompactEntryDrop(targets: CompactEntryDropTarget[]) {
+  if (!targets.length) return;
+
+  dropAnalysisStore.receive(targets);
+  const agentId = mockAgentStore.selectedAgentId;
+  await router.push(agentId ? `/chat/${agentId}` : "/chat");
+}
+
 function handlePermissionResponse(decision: string) {
   const req = permissionQueue.value[0];
   if (!req) return;
@@ -283,6 +308,7 @@ let unsubIntegrityAlert: (() => void) | null = null;
 let unsubPermission: (() => void) | null = null;
 let unsubAclTimeout: (() => void) | null = null;
 let unsubAclIneffective: (() => void) | null = null;
+let unsubCompactEntryDrop: (() => void) | null = null;
 let historyPollTimer: number | null = null;
 
 onMounted(async () => {
@@ -426,6 +452,10 @@ onMounted(async () => {
     });
   }
 
+  unsubCompactEntryDrop = window.openclaw.compactEntry.onDroppedTargets((targets) => {
+    void handleCompactEntryDrop(targets);
+  });
+
   // Get initial status
   window.openclaw.gateway.getStatus().then((s) => (gateway.status = s));
   window.openclaw.gateway.getPort().then((p) => (gateway.port = p));
@@ -469,6 +499,7 @@ onUnmounted(() => {
   unsubPermission?.();
   unsubAclTimeout?.();
   unsubAclIneffective?.();
+  unsubCompactEntryDrop?.();
   if (historyPollTimer) window.clearInterval(historyPollTimer);
 });
 </script>

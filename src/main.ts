@@ -166,6 +166,12 @@ let cachedRemoteSource: {
   baseUrl: string; token?: string; contextToken?: string;
 } | null = null;
 
+interface CompactEntryDropTarget {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Skill file watcher — detects mid-session tampering
 // ---------------------------------------------------------------------------
@@ -931,7 +937,50 @@ async function refreshCompactEntryWindow(): Promise<void> {
   }));
 }
 
-function showMainWindow(): void {
+function getCompactEntryTargetName(targetPath: string): string {
+  const normalized = targetPath.replace(/[/\\]+$/, "");
+  return path.basename(normalized) || normalized;
+}
+
+function parseCompactEntryDropTargets(url: string): CompactEntryDropTarget[] {
+  if (!url.startsWith(COMPACT_ENTRY_RESTORE_URL)) return [];
+
+  try {
+    const parsed = new URL(url);
+    const raw = parsed.searchParams.get("paths");
+    if (!raw) return [];
+
+    const candidate = JSON.parse(raw);
+    if (!Array.isArray(candidate)) return [];
+
+    const uniqueResolvedPaths = Array.from(new Set(
+      candidate
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => path.resolve(value))
+    )).slice(0, 8);
+
+    return uniqueResolvedPaths.map((targetPath) => {
+      let isDirectory = false;
+      try {
+        isDirectory = fs.statSync(targetPath).isDirectory();
+      } catch {
+        isDirectory = false;
+      }
+
+      return {
+        path: targetPath,
+        name: getCompactEntryTargetName(targetPath),
+        isDirectory,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function showMainWindow(compactDropTargets?: CompactEntryDropTarget[]): void {
   hideCompactEntryWindow();
 
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -953,6 +1002,10 @@ function showMainWindow(): void {
     mainWindow.maximize();
   }
   mainWindow.focus();
+
+  if (compactDropTargets?.length) {
+    mainWindow.webContents.send("compact-entry:dropped-targets", compactDropTargets);
+  }
 }
 
 function createCompactEntryWindow(): BrowserWindow {
@@ -971,7 +1024,7 @@ function createCompactEntryWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
-    roundedCorners: true,
+    roundedCorners: false,
     acceptFirstMouse: true,
     hasShadow: false,
     hiddenInMissionControl: true,
@@ -1002,8 +1055,9 @@ function createCompactEntryWindow(): BrowserWindow {
 
   win.webContents.on("will-navigate", (event, url) => {
     event.preventDefault();
-    if (url === COMPACT_ENTRY_RESTORE_URL) {
-      showMainWindow();
+    if (url.startsWith(COMPACT_ENTRY_RESTORE_URL)) {
+      const compactDropTargets = parseCompactEntryDropTargets(url);
+      showMainWindow(compactDropTargets.length ? compactDropTargets : undefined);
     }
   });
 

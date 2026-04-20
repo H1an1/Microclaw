@@ -49,6 +49,12 @@ interface IntegrityResult {
   changes: IntegrityChange[];
 }
 
+interface CompactEntryDropTarget {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+}
+
 interface OpenClawAPI {
   setup: {
     openMain(): Promise<boolean>;
@@ -131,6 +137,9 @@ interface OpenClawAPI {
   };
   model: {
     testConnection(params: { baseUrl: string; apiKey: string; apiFormat: string; modelName: string; reasoningEffort?: string }): Promise<{ ok: boolean; message: string }>;
+  };
+  compactEntry: {
+    onDroppedTargets(callback: (targets: CompactEntryDropTarget[]) => void): () => void;
   };
   window: {
     minimize(): Promise<void>;

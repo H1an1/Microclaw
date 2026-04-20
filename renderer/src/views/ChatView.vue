@@ -2,6 +2,12 @@
   <div class="chat-view">
     <!-- Chat thread -->
     <div class="chat-thread" ref="threadRef" @scroll="handleScroll" @click="handleThreadClick">
+      <!-- Drop analysis flow -->
+      <DropAnalysisFlow
+        v-if="dropAnalysisStore.active"
+        @pick="(prompt) => { inputText = prompt; dropAnalysisStore.dismiss(); nextTick(() => inputRef?.focus()) }"
+      />
+
       <!-- Loading (only shown on initial load, not background refresh) -->
       <div v-if="!isDemoMode && chatStore.loading && chatStore.messages.length === 0" class="chat-empty">
         <div class="chat-empty__hint">{{ t('chat.loading') }}</div>
@@ -315,6 +321,8 @@ import { useSessionStore } from "@/stores/sessions";
 import { useMockAgentStore } from "@/stores/mockAgents";
 import { useMvpTasks } from "@/composables/useMvpTasks";
 import ChatWelcome from "@/components/ChatWelcome.vue";
+import DropAnalysisFlow from "@/components/DropAnalysisFlow.vue";
+import { useDropAnalysisStore } from "@/stores/dropAnalysis";
 import agentAvatarImg from "@/assets/normal.png";
 import gifSearch from "@/assets/openclaw_search_preview_transparent.gif";
 import gifBook from "@/assets/book.gif";
@@ -326,6 +334,7 @@ import { t, locale } from "@/i18n";
 const route = useRoute();
 const _router = useRouter();
 const chatStore = useChatStore();
+const dropAnalysisStore = useDropAnalysisStore();
 const agentStore = useAgentStore();
 const sessionStore = useSessionStore();
 const mockAgentStore = useMockAgentStore();
@@ -371,6 +380,7 @@ const hasSavedHistory = computed(() =>
 
 // Welcome state: show fan cards only before user has sent anything in this session
 const showWelcomeState = computed(() => {
+  if (dropAnalysisStore.active) return false
   if (isDemoMode.value) return !hasDemoMessages.value
   if (sessionStartedInView.value) return false
   if (!shouldShowFirstVisitWelcome.value) return false
@@ -536,6 +546,21 @@ function isHistoryPanelOpen(key: string): boolean {
 }
 
 // Auto-send when navigated here with a pending prompt.
+watch(
+  () => chatStore.pendingDraft,
+  (draft) => {
+    if (draft) {
+      inputText.value = draft;
+      chatStore.pendingDraft = null;
+      nextTick(() => {
+        autoResize();
+        inputRef.value?.focus();
+      });
+    }
+  },
+  { immediate: true }
+);
+
 watch(
   () => chatStore.pendingPrompt,
   (prompt) => {

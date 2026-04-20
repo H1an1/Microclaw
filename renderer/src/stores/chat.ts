@@ -47,6 +47,9 @@ export const useChatStore = defineStore("chat", () => {
   /** Prompt text to pre-fill in the chat input after navigation. */
   const pendingPrompt = ref<string | null>(null);
 
+  /** Draft text to pre-fill in the chat input without auto-sending. */
+  const pendingDraft = ref<string | null>(null);
+
   /** Per-agent last message preview text */
   const lastMessageMap = ref<Record<string, string>>({});
 
@@ -833,6 +836,7 @@ export const useChatStore = defineStore("chat", () => {
     lastMessageMap,
     lastStreamEventAt,
     pendingPrompt,
+    pendingDraft,
     extractText,
     switchSession,
     loadHistory,

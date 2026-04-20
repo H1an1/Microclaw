@@ -187,6 +187,14 @@ contextBridge.exposeInMainWorld("openclaw", {
     getStats: () => ipcRenderer.invoke("usage:get-stats"),
   },
 
+  compactEntry: {
+    onDroppedTargets: (callback: (targets: { path: string; name: string; isDirectory: boolean }[]) => void) => {
+      const handler = (_event: any, targets: any) => callback(targets);
+      ipcRenderer.on("compact-entry:dropped-targets", handler);
+      return () => ipcRenderer.removeListener("compact-entry:dropped-targets", handler);
+    },
+  },
+
   // --- Window ---
   window: {
     minimize: () => ipcRenderer.invoke("window:minimize"),
